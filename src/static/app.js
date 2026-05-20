@@ -472,6 +472,73 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Build text and URL for sharing activity details
+  function getShareContent(name, details) {
+    const formattedSchedule = formatSchedule(details);
+    const shareText = `Join me at ${name}! ${details.description} Schedule: ${formattedSchedule}`;
+    const shareUrl = `${window.location.origin}/static/index.html`;
+
+    return { shareText, shareUrl };
+  }
+
+  // Open social share window safely
+  function openShareWindow(url) {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  // Handle clicks on share buttons
+  function handleShare(event) {
+    const button = event.currentTarget;
+    const platform = button.dataset.platform;
+    const activity = button.dataset.activity;
+    const details = allActivities[activity];
+
+    if (!details) {
+      showMessage("Unable to share this activity right now.", "error");
+      return;
+    }
+
+    const { shareText, shareUrl } = getShareContent(activity, details);
+    const encodedText = encodeURIComponent(shareText);
+    const encodedUrl = encodeURIComponent(shareUrl);
+
+    if (platform === "native" && navigator.share) {
+      navigator
+        .share({ title: activity, text: shareText, url: shareUrl })
+        .catch((error) => {
+          if (error?.name !== "AbortError") {
+            showMessage("Sharing was cancelled or failed.", "error");
+          }
+        });
+      return;
+    }
+
+    if (platform === "x") {
+      openShareWindow(
+        `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`
+      );
+      return;
+    }
+
+    if (platform === "facebook") {
+      openShareWindow(
+        `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`
+      );
+      return;
+    }
+
+    if (platform === "whatsapp") {
+      openShareWindow(`https://wa.me/?text=${encodedText}%20${encodedUrl}`);
+      return;
+    }
+
+    if (platform === "email") {
+      window.location.href = `mailto:?subject=${encodeURIComponent(
+        `Activity recommendation: ${activity}`
+      )}&body=${encodeURIComponent(`${shareText}\n\n${shareUrl}`)}`;
+    }
+  }
+
   // Function to render a single activity card
   function renderActivityCard(name, details) {
     const activityCard = document.createElement("div");
@@ -552,6 +619,18 @@ document.addEventListener("DOMContentLoaded", () => {
             .join("")}
         </ul>
       </div>
+      <div class="share-actions" aria-label="Share this activity">
+        <span class="share-label">Share:</span>
+        ${
+          navigator.share
+            ? `<button type="button" class="share-button" data-platform="native" data-activity="${name}">Share</button>`
+            : ""
+        }
+        <button type="button" class="share-button" data-platform="x" data-activity="${name}">X</button>
+        <button type="button" class="share-button" data-platform="facebook" data-activity="${name}">Facebook</button>
+        <button type="button" class="share-button" data-platform="whatsapp" data-activity="${name}">WhatsApp</button>
+        <button type="button" class="share-button" data-platform="email" data-activity="${name}">Email</button>
+      </div>
       <div class="activity-card-actions">
         ${
           currentUser
@@ -575,6 +654,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const deleteButtons = activityCard.querySelectorAll(".delete-participant");
     deleteButtons.forEach((button) => {
       button.addEventListener("click", handleUnregister);
+    });
+
+    // Add click handlers for share buttons
+    const shareButtons = activityCard.querySelectorAll(".share-button");
+    shareButtons.forEach((button) => {
+      button.addEventListener("click", handleShare);
     });
 
     // Add click handler for register button (only when authenticated)
